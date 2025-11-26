@@ -19,13 +19,38 @@
       gap: 24px;
       align-items: flex-start;
     }
+
+    .box {
+      position: fixed;
+      right: 200px;
+      bottom: 200px;
+    }
+
+    @media (max-width: 768px) {
+
+      body {
+        padding: 0px;
+      }
+
+      .demo-container {
+        display: block;
+      }
+
+      .box {
+        position: static;
+      }
+    }
   </style>
 </head>
 
 <body>
+  <div class="control-warp">
+    <div>点击打开</div>
+
+  </div>
   <div class="demo-container">
-    <qcc-ai-chatbot proxy-url="http://localhost:3000" provider="qwen" model="qwen-plus" title="企业 AI 助手"
-      theme-color="#2563eb" debug="true"></qcc-ai-chatbot>
+    <qcc-ai-chatbot class="box" proxy-url="http://localhost:3000" provider="qwen" model="qwen-plus" title="企业 AI 助手"
+      theme-color="#128bed" debug="true"></qcc-ai-chatbot>
   </div>
 
   <script type="module" src="./dist/qcc-ai-chatbot.js"></script>

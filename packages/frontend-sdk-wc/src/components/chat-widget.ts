@@ -30,19 +30,23 @@ export class QccAiChatbot extends HTMLElement {
   private shadow: ShadowRoot | null = null;
 
   private rootEl: HTMLDivElement | null = null;
+  private panelEl: HTMLDivElement | null = null;
   private headerTitleEl: HTMLSpanElement | null = null;
   private messagesEl: HTMLDivElement | null = null;
   private toolStatusEl: HTMLDivElement | null = null;
   private inputEl: HTMLTextAreaElement | null = null;
   private sendButtonEl: HTMLButtonElement | null = null;
   private loadingTextEl: HTMLSpanElement | null = null;
+  private fabButtonEl: HTMLButtonElement | null = null;
+  private closeButtonEl: HTMLButtonElement | null = null;
 
   private engine: AiEngine | null = null;
   private eventEmitter: EventEmitter | null = null;
 
   private messages: Message[] = [];
   private isProcessing = false;
-  private isOpen = true;
+  private isOpen = false;
+  private isMobileViewport = false;
   private toolStatusText = '';
   private streamingMessageId: string | null = null;
 
@@ -51,6 +55,8 @@ export class QccAiChatbot extends HTMLElement {
   private debug = false;
 
   private coreConfigSignature: CoreConfigSignature = null;
+  private mediaQuery: MediaQueryList | null = null;
+  private mediaQueryHandler: ((event: MediaQueryListEvent | MediaQueryList) => void) | null = null;
 
   constructor() {
     super();
@@ -64,11 +70,13 @@ export class QccAiChatbot extends HTMLElement {
       this.applyThemeColor();
       this.updateHeaderTitle();
       this.updateOpenState();
+      this.initViewportWatcher();
     }
   }
 
   disconnectedCallback(): void {
     void this.destroyEngine();
+    this.cleanupViewportWatcher();
   }
 
   attributeChangedCallback(name: string, _oldValue: string | null, newValue: string | null): void {
@@ -96,6 +104,7 @@ export class QccAiChatbot extends HTMLElement {
    * 对外 API：收起面板
    */
   public close(): void {
+    if (this.isMobileViewport) return;
     this.isOpen = false;
     this.updateOpenState();
   }
@@ -324,8 +333,26 @@ export class QccAiChatbot extends HTMLElement {
     this.shadow.appendChild(style);
 
     const root = document.createElement('div');
-    root.className = 'qcc-chatbot';
+    root.className = 'qcc-chatbot qcc-chatbot--closed';
     this.rootEl = root;
+
+    const panel = document.createElement('div');
+    panel.className = 'qcc-chatbot__panel';
+    panel.setAttribute('aria-hidden', 'true');
+    this.panelEl = panel;
+
+    const fab = document.createElement('button');
+    fab.type = 'button';
+    fab.className = 'qcc-chatbot__fab';
+    fab.title = '打开聊天窗口';
+    fab.setAttribute('aria-label', '打开聊天窗口');
+    fab.innerHTML = this.renderRobotIcon();
+    fab.addEventListener('click', () => {
+      if (this.isMobileViewport) return;
+      this.isOpen = true;
+      this.updateOpenState();
+    });
+    this.fabButtonEl = fab;
 
     // Header
     const header = document.createElement('div');
@@ -346,27 +373,21 @@ export class QccAiChatbot extends HTMLElement {
     const headerActions = document.createElement('div');
     headerActions.className = 'qcc-chatbot__header-actions';
 
-    const toggleBtn = document.createElement('button');
-    toggleBtn.type = 'button';
-    toggleBtn.className = 'qcc-chatbot__icon-button';
-    toggleBtn.title = '展开/收起';
-    toggleBtn.innerHTML = '▾';
-    toggleBtn.addEventListener('click', () => {
-      this.isOpen = !this.isOpen;
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'qcc-chatbot__circle-button';
+    closeBtn.title = '收起';
+    closeBtn.setAttribute('aria-label', '收起窗口');
+    closeBtn.innerHTML =
+      '<svg class="qcc-chatbot__icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9m0-9l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    closeBtn.addEventListener('click', () => {
+      if (this.isMobileViewport) return;
+      this.isOpen = false;
       this.updateOpenState();
     });
+    this.closeButtonEl = closeBtn;
 
-    const clearBtn = document.createElement('button');
-    clearBtn.type = 'button';
-    clearBtn.className = 'qcc-chatbot__icon-button';
-    clearBtn.title = '清空对话';
-    clearBtn.innerHTML = '✕';
-    clearBtn.addEventListener('click', () => {
-      this.clearMessages();
-    });
-
-    headerActions.appendChild(toggleBtn);
-    headerActions.appendChild(clearBtn);
+    headerActions.appendChild(closeBtn);
 
     header.appendChild(title);
     header.appendChild(headerActions);
@@ -391,7 +412,7 @@ export class QccAiChatbot extends HTMLElement {
 
     const textarea = document.createElement('textarea');
     textarea.className = 'qcc-chatbot__input';
-    textarea.rows = 1;
+    textarea.rows = 2;
     textarea.placeholder = '请输入内容，按 Enter 发送，Shift+Enter 换行';
     this.inputEl = textarea;
 
@@ -417,13 +438,26 @@ export class QccAiChatbot extends HTMLElement {
 
     const hint = document.createElement('div');
     hint.className = 'qcc-chatbot__hint';
-    hint.innerHTML = '<span>按 Enter 发送，Shift+Enter 换行</span>';
+
+    const hintText = document.createElement('span');
+    hintText.textContent = '按 Enter 发送，Shift+Enter 换行';
+
+    const hintActions = document.createElement('div');
+    hintActions.className = 'qcc-chatbot__hint-actions';
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'qcc-chatbot__plain-button';
+    clearBtn.textContent = '清空';
+    clearBtn.addEventListener('click', () => {
+      this.clearMessages();
+    });
 
     const loading = document.createElement('span');
     loading.className = 'qcc-chatbot__loading';
-    const loadingText = document.createElement('span');
-    loadingText.textContent = '思考中';
-    this.loadingTextEl = loadingText;
+    const loadingLabel = document.createElement('span');
+    loadingLabel.textContent = '思考中';
+    this.loadingTextEl = loading;
 
     const loadingDots = document.createElement('span');
     loadingDots.className = 'qcc-chatbot__loading-dots';
@@ -432,20 +466,27 @@ export class QccAiChatbot extends HTMLElement {
       '<span class="qcc-chatbot__loading-dot"></span>' +
       '<span class="qcc-chatbot__loading-dot"></span>';
 
-    loading.appendChild(loadingText);
+    loading.appendChild(loadingLabel);
     loading.appendChild(loadingDots);
 
-    hint.appendChild(loading);
+    hintActions.appendChild(clearBtn);
+    hintActions.appendChild(loading);
+
+    hint.appendChild(hintText);
+    hint.appendChild(hintActions);
 
     inputArea.appendChild(inputRow);
     inputArea.appendChild(hint);
 
     body.appendChild(messages);
     body.appendChild(toolStatus);
-    body.appendChild(inputArea);
 
-    root.appendChild(header);
-    root.appendChild(body);
+    panel.appendChild(header);
+    panel.appendChild(body);
+    panel.appendChild(inputArea);
+
+    root.appendChild(panel);
+    root.appendChild(fab);
     this.shadow.appendChild(root);
 
     this.renderMessages();
@@ -468,10 +509,19 @@ export class QccAiChatbot extends HTMLElement {
 
   private updateOpenState(): void {
     if (!this.rootEl) return;
-    if (this.isOpen) {
-      this.rootEl.classList.remove('qcc-chatbot--closed');
-    } else {
-      this.rootEl.classList.add('qcc-chatbot--closed');
+    const root = this.rootEl;
+    root.classList.toggle('qcc-chatbot--open', this.isOpen);
+    root.classList.toggle('qcc-chatbot--closed', !this.isOpen);
+    root.classList.toggle('qcc-chatbot--mobile', this.isMobileViewport);
+    if (this.panelEl) {
+      this.panelEl.setAttribute('aria-hidden', this.isOpen ? 'false' : 'true');
+    }
+    if (this.fabButtonEl) {
+      this.fabButtonEl.setAttribute('aria-expanded', this.isOpen ? 'true' : 'false');
+      this.fabButtonEl.disabled = this.isMobileViewport;
+    }
+    if (this.closeButtonEl) {
+      this.closeButtonEl.disabled = this.isMobileViewport;
     }
   }
 
@@ -491,6 +541,7 @@ export class QccAiChatbot extends HTMLElement {
 
     for (const msg of this.messages) {
       const line = document.createElement('div');
+      line.className = 'qcc-chatbot__message-line';
       const bubble = document.createElement(
         'qcc-message-bubble'
       ) as unknown as QccMessageBubble;
@@ -593,6 +644,60 @@ export class QccAiChatbot extends HTMLElement {
       this.updateLoadingState();
     }
   }
+
+  private renderRobotIcon(): string {
+    return `
+      <span class="qcc-chatbot__fab-icon" aria-hidden="true">
+        <svg viewBox="0 0 48 48" role="presentation">
+          <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="14" width="30" height="20" rx="10"></rect>
+            <path d="M9 26H4m40 0h-5M19 38h10"></path>
+            <circle cx="19" cy="24" r="2"></circle>
+            <circle cx="29" cy="24" r="2"></circle>
+            <path d="M24 14V8"></path>
+          </g>
+        </svg>
+      </span>
+    `;
+  }
+
+  private initViewportWatcher(): void {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia('(max-width: 767px)');
+    this.mediaQuery = media;
+    this.applyViewportMode(media.matches);
+    const handler = (event: MediaQueryListEvent | MediaQueryList): void => {
+      this.applyViewportMode('matches' in event ? event.matches : media.matches);
+    };
+    this.mediaQueryHandler = handler;
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', handler);
+    } else if (typeof media.addListener === 'function') {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - legacy Safari
+      media.addListener(handler);
+    }
+  }
+
+  private cleanupViewportWatcher(): void {
+    if (this.mediaQuery && this.mediaQueryHandler) {
+      if (typeof this.mediaQuery.removeEventListener === 'function') {
+        this.mediaQuery.removeEventListener('change', this.mediaQueryHandler);
+      } else if (typeof this.mediaQuery.removeListener === 'function') {
+        this.mediaQuery.removeListener(this.mediaQueryHandler);
+      }
+    }
+    this.mediaQuery = null;
+    this.mediaQueryHandler = null;
+  }
+
+  private applyViewportMode(isMobile: boolean): void {
+    this.isMobileViewport = isMobile;
+    if (isMobile) {
+      this.isOpen = true;
+    }
+    this.updateOpenState();
+  }
 }
 
 declare global {
@@ -600,5 +705,3 @@ declare global {
     'qcc-ai-chatbot': QccAiChatbot;
   }
 }
-
-
