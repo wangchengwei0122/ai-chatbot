@@ -100,6 +100,7 @@ const mcpRoutes: FastifyPluginAsync = async (fastify) => {
         tool_call_id?: string;
         name?: string;
       }>;
+      selectedMcpIds?: string[];
     };
   }>('/mcp/send-message', async (request, reply) => {
     const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -111,7 +112,7 @@ const mcpRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     try {
-      const { mcp, provider, model, messages } = request.body;
+      const { mcp, provider, model, messages, selectedMcpIds } = request.body;
 
       if (!provider || !model) {
         console.error(`[MCP Routes] [${requestId}] Validation failed: provider or model missing`);
@@ -131,7 +132,12 @@ const mcpRoutes: FastifyPluginAsync = async (fastify) => {
         };
       }
 
-      console.log(`[MCP Routes] [${requestId}] Validation passed, setting up SSE headers`);
+      const enableMcp =
+        Array.isArray(selectedMcpIds) && selectedMcpIds.length > 0;
+
+      console.log(
+        `[MCP Routes] [${requestId}] Validation passed, setting up SSE headers (enableMcp=${enableMcp})`
+      );
 
       // CORS 头（Fastify CORS 对 raw 响应不自动处理，需要手动设置）
       const requestOrigin = request.headers.origin;
@@ -190,8 +196,16 @@ const mcpRoutes: FastifyPluginAsync = async (fastify) => {
       // 处理流式响应
       let isClosed = false;
       try {
-        console.log(`[MCP Routes] [${requestId}] Starting to iterate over stream generator`);
-        for await (const chunk of toolEngine.processMessageStream(provider, model, messages, mcp)) {
+        console.log(
+          `[MCP Routes] [${requestId}] Starting to iterate over stream generator`
+        );
+        for await (const chunk of toolEngine.processMessageStream(
+          provider,
+          model,
+          messages,
+          mcp,
+          enableMcp
+        )) {
           if (isClosed) {
             console.log(`[MCP Routes] [${requestId}] Connection already closed, breaking loop`);
             break;
@@ -239,6 +253,20 @@ const mcpRoutes: FastifyPluginAsync = async (fastify) => {
         servers: mcpManager.getAvailableMcpIds(),
         default: mcpManager.getDefaultMcpId(),
       },
+    };
+  });
+
+  /**
+   * 获取 MCP 列表（给前端 SDK 使用）
+   * GET /mcp/list
+   *
+   * 返回结构：
+   * { "mcpList": ["basic","qcc-mcp","search"] }
+   */
+  fastify.get('/mcp/list', async () => {
+    const mcpList = mcpManager.getAvailableMcpIds();
+    return {
+      mcpList,
     };
   });
 };

@@ -35,6 +35,8 @@ export class QccAiChatbot extends HTMLElement {
   private messagesEl: HTMLDivElement | null = null;
   private toolStatusEl: HTMLDivElement | null = null;
   private inputEl: HTMLTextAreaElement | null = null;
+  private mcpMenuEl: HTMLDivElement | null = null;
+  private mcpIconButtonEl: HTMLButtonElement | null = null;
   private sendButtonEl: HTMLButtonElement | null = null;
   private loadingTextEl: HTMLSpanElement | null = null;
   private fabButtonEl: HTMLButtonElement | null = null;
@@ -49,6 +51,12 @@ export class QccAiChatbot extends HTMLElement {
   private isMobileViewport = false;
   private toolStatusText = '';
   private streamingMessageId: string | null = null;
+
+  // MCP 相关 state
+  private allMcpList: string[] = [];
+  private selectedMcpIds: string[] = [];
+  private isMcpMenuOpen = false;
+  private documentClickHandler: ((event: MouseEvent) => void) | null = null;
 
   private uiTitle = '智能助手';
   private themeColor: string | null = null;
@@ -71,12 +79,15 @@ export class QccAiChatbot extends HTMLElement {
       this.updateHeaderTitle();
       this.updateOpenState();
       this.initViewportWatcher();
+      void this.fetchMcpListIfPossible();
+      this.initDocumentClickListener();
     }
   }
 
   disconnectedCallback(): void {
     void this.destroyEngine();
     this.cleanupViewportWatcher();
+    this.cleanupDocumentClickListener();
   }
 
   attributeChangedCallback(name: string, _oldValue: string | null, newValue: string | null): void {
@@ -95,9 +106,12 @@ export class QccAiChatbot extends HTMLElement {
   /**
    * 对外 API：打开面板
    */
-  public open(): void {
+  public open(text?: string): void {
     this.isOpen = true;
     this.updateOpenState();
+    if (text) {
+      this.sendMessage(text);
+    }
   }
 
   /**
@@ -176,6 +190,7 @@ export class QccAiChatbot extends HTMLElement {
   private handleCoreAttributeChange(): void {
     // 仅当核心配置变化时才重建 engine
     void this.setupEngineIfNeeded(true);
+    void this.fetchMcpListIfPossible();
   }
 
   private buildCoreConfig(): CoreConfigFields | null {
@@ -407,6 +422,27 @@ export class QccAiChatbot extends HTMLElement {
     const inputArea = document.createElement('div');
     inputArea.className = 'qcc-chatbot__input-area';
 
+    // MCP 工具栏
+    const toolbar = document.createElement('div');
+    toolbar.className = 'qcc-chatbot__toolbar';
+
+    const mcpButton = document.createElement('button');
+    mcpButton.type = 'button';
+    mcpButton.className = 'qcc-chatbot__toolbar-icon';
+    mcpButton.title = '选择 MCP';
+    mcpButton.setAttribute('aria-label', '选择 MCP');
+    mcpButton.innerHTML = `
+      <svg class="qcc-chatbot__icon" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M4 6.5a2.5 2.5 0 0 1 2.5-2.5h7A2.5 2.5 0 0 1 16 6.5v1A2.5 2.5 0 0 1 13.5 10h-7A2.5 2.5 0 0 1 4 7.5v-1Zm0 7a2.5 2.5 0 0 1 2.5-2.5h2a.75.75 0 0 1 0 1.5h-2A1 1 0 0 0 5 13.5v1A1 1 0 0 0 6.5 15h7a1 1 0 0 0 1-1v-1a.75.75 0 0 1 1.5 0v1A2.5 2.5 0 0 1 13.5 16h-7A2.5 2.5 0 0 1 4 14.5v-1Z" fill="currentColor"/>
+      </svg>
+      <span class="qcc-chatbot__toolbar-icon-label">MCP</span>
+    `;
+    mcpButton.addEventListener('click', (event: MouseEvent) => {
+      event.stopPropagation();
+      this.toggleMcpMenu();
+    });
+    this.mcpIconButtonEl = mcpButton;
+
     const inputRow = document.createElement('div');
     inputRow.className = 'qcc-chatbot__input-row';
 
@@ -475,6 +511,15 @@ export class QccAiChatbot extends HTMLElement {
     hint.appendChild(hintText);
     hint.appendChild(hintActions);
 
+    const mcpMenu = document.createElement('div');
+    mcpMenu.className = 'qcc-chatbot__mcp-menu';
+    this.mcpMenuEl = mcpMenu;
+
+    toolbar.appendChild(mcpButton);
+    toolbar.appendChild(mcpMenu);
+
+    // 工具栏在输入区域上方
+    inputArea.appendChild(toolbar);
     inputArea.appendChild(inputRow);
     inputArea.appendChild(hint);
 
@@ -492,6 +537,7 @@ export class QccAiChatbot extends HTMLElement {
     this.renderMessages();
     this.renderToolStatus();
     this.updateLoadingState();
+    this.renderMcpMenu();
   }
 
   private updateHeaderTitle(): void {
@@ -624,13 +670,16 @@ export class QccAiChatbot extends HTMLElement {
 
     this.isProcessing = true;
     this.updateLoadingState();
+    this.closeMcpMenu();
 
     if (!textFromApi && this.inputEl) {
       this.inputEl.value = '';
     }
 
     try {
-      await this.engine.processMessage(text);
+      await this.engine.processMessage(text, {
+        selectedMcpIds: this.selectedMcpIds,
+      });
     } catch (error) {
       const formatted = formatError(error);
       this.toolStatusText = '发送消息失败，请稍后重试';
@@ -697,6 +746,143 @@ export class QccAiChatbot extends HTMLElement {
       this.isOpen = true;
     }
     this.updateOpenState();
+  }
+
+  // =========================
+  // MCP 菜单相关
+  // =========================
+
+  private async fetchMcpListIfPossible(): Promise<void> {
+    const core = this.buildCoreConfig();
+    const proxyUrl = core?.proxyUrl || '';
+    if (!proxyUrl) return;
+
+    try {
+      const normalizedProxyUrl = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl;
+      const resp = await fetch(`${normalizedProxyUrl}/mcp/list`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!resp.ok) {
+        if (this.debug) {
+          // eslint-disable-next-line no-console
+          console.warn('qcc-ai-chatbot: Failed to fetch MCP list', resp.status, resp.statusText);
+        }
+        return;
+      }
+      const data = (await resp.json()) as { mcpList?: string[] };
+      if (Array.isArray(data.mcpList)) {
+        this.allMcpList = data.mcpList;
+        this.renderMcpMenu();
+      }
+    } catch (error) {
+      if (this.debug) {
+        const formatted = formatError(error as Error);
+        // eslint-disable-next-line no-console
+        console.error('qcc-ai-chatbot: Error fetching MCP list', formatted);
+      }
+    }
+  }
+
+  private renderMcpMenu(): void {
+    if (!this.mcpMenuEl) return;
+    const menu = this.mcpMenuEl;
+    menu.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.className = 'qcc-chatbot__mcp-menu-title';
+    title.textContent = '选择 MCP';
+    menu.appendChild(title);
+
+    if (!this.allMcpList.length) {
+      const empty = document.createElement('div');
+      empty.className = 'qcc-chatbot__mcp-menu-empty';
+      empty.textContent = '暂无可用 MCP';
+      menu.appendChild(empty);
+    } else {
+      const list = document.createElement('div');
+      list.className = 'qcc-chatbot__mcp-menu-list';
+
+      for (const mcpId of this.allMcpList) {
+        const item = document.createElement('label');
+        item.className = 'qcc-chatbot__mcp-item';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = this.selectedMcpIds.includes(mcpId);
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) {
+            if (!this.selectedMcpIds.includes(mcpId)) {
+              this.selectedMcpIds = [...this.selectedMcpIds, mcpId];
+            }
+          } else {
+            this.selectedMcpIds = this.selectedMcpIds.filter((id) => id !== mcpId);
+          }
+        });
+
+        const labelText = document.createElement('span');
+        labelText.textContent = mcpId;
+
+        item.appendChild(checkbox);
+        item.appendChild(labelText);
+        list.appendChild(item);
+      }
+
+      menu.appendChild(list);
+    }
+
+    this.updateMcpMenuVisibility();
+  }
+
+  private toggleMcpMenu(): void {
+    this.isMcpMenuOpen = !this.isMcpMenuOpen;
+    this.updateMcpMenuVisibility();
+  }
+
+  private closeMcpMenu(): void {
+    if (!this.isMcpMenuOpen) return;
+    this.isMcpMenuOpen = false;
+    this.updateMcpMenuVisibility();
+  }
+
+  private updateMcpMenuVisibility(): void {
+    if (!this.mcpMenuEl) return;
+    if (this.isMcpMenuOpen) {
+      this.mcpMenuEl.classList.add('qcc-chatbot__mcp-menu--open');
+    } else {
+      this.mcpMenuEl.classList.remove('qcc-chatbot__mcp-menu--open');
+    }
+  }
+
+  private initDocumentClickListener(): void {
+    if (this.documentClickHandler) return;
+    this.documentClickHandler = (event: MouseEvent) => {
+      if (!this.isMcpMenuOpen) return;
+      const target = event.target as Node | null;
+      if (!target) return;
+
+      const path = (event.composedPath && event.composedPath()) || [];
+      const clickedOnMenu =
+        (this.mcpMenuEl && path.includes(this.mcpMenuEl)) ||
+        (this.mcpMenuEl && this.mcpMenuEl.contains(target));
+      const clickedOnIcon =
+        (this.mcpIconButtonEl && path.includes(this.mcpIconButtonEl)) ||
+        (this.mcpIconButtonEl && this.mcpIconButtonEl.contains(target));
+
+      if (!clickedOnMenu && !clickedOnIcon) {
+        this.closeMcpMenu();
+      }
+    };
+    document.addEventListener('click', this.documentClickHandler, true);
+  }
+
+  private cleanupDocumentClickListener(): void {
+    if (this.documentClickHandler) {
+      document.removeEventListener('click', this.documentClickHandler, true);
+      this.documentClickHandler = null;
+    }
   }
 }
 

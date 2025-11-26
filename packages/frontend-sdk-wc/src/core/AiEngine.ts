@@ -30,7 +30,10 @@ export class AiEngine {
   /**
    * 处理用户消息（主入口）
    */
-  async processMessage(userMessage: string, options?: { mcp?: string }): Promise<void> {
+  async processMessage(
+    userMessage: string,
+    options?: { mcp?: string; selectedMcpIds?: string[] }
+  ): Promise<void> {
     try {
       // 添加用户消息
       const userMsg: Message = {
@@ -43,7 +46,10 @@ export class AiEngine {
       this.eventEmitter.emit('message', userMsg);
 
       // 调用 Proxy Server 的 /mcp/send-message 接口
-      await this.processWithProxyServer([userMsg], options?.mcp);
+      await this.processWithProxyServer([userMsg], {
+        mcp: options?.mcp,
+        selectedMcpIds: options?.selectedMcpIds,
+      });
     } catch (error) {
       const formattedError = formatError(error);
       logger.error('AiEngine', 'Process message failed:', formattedError);
@@ -59,7 +65,7 @@ export class AiEngine {
    */
   private async processWithProxyServer(
     conversationMessages: Message[],
-    mcp?: string
+    options?: { mcp?: string; selectedMcpIds?: string[] }
   ): Promise<void> {
     if (!this.config.proxyUrl) {
       throw new Error('proxyUrl is required');
@@ -82,17 +88,24 @@ export class AiEngine {
 
     try {
       // 调用 Proxy Server
+      const body: {
+        provider: string;
+        model: string;
+        messages: ReturnType<AiEngine['convertToLLMMessages']>;
+        selectedMcpIds: string[];
+      } = {
+        provider: this.config.provider,
+        model: this.config.model,
+        messages: llmMessages,
+        selectedMcpIds: options?.selectedMcpIds ?? [],
+      };
+
       const response = await fetch(`${this.config.proxyUrl}/mcp/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          mcp: mcp || this.config.mcp,
-          provider: this.config.provider,
-          model: this.config.model,
-          messages: llmMessages,
-        }),
+        body: JSON.stringify(body),
         signal: this.currentAbortController.signal,
       });
 

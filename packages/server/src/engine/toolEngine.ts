@@ -29,16 +29,18 @@ export class ToolEngine {
     provider: string,
     model: string,
     messages: ChatMessage[],
-    mcpId?: string
+    mcpId?: string,
+    useMcp: boolean = true
   ): AsyncGenerator<StreamChunk, void, unknown> {
     console.log('[Tool Engine] processMessageStream started:', {
       provider,
       model,
       mcpId,
       messagesCount: messages.length,
+      useMcp,
     });
     try {
-      yield* this.processWithToolsStream(provider, model, messages, mcpId, 0);
+      yield* this.processWithToolsStream(provider, model, messages, mcpId, useMcp, 0);
       console.log('[Tool Engine] processMessageStream completed');
     } catch (error) {
       console.error('[Tool Engine] processMessageStream error:', error);
@@ -54,6 +56,7 @@ export class ToolEngine {
     model: string,
     conversationMessages: ChatMessage[],
     mcpId: string | undefined,
+    useMcp: boolean,
     depth: number
   ): AsyncGenerator<StreamChunk, void, unknown> {
     console.log(`[Tool Engine] [depth:${depth}] processWithToolsStream started`);
@@ -65,14 +68,30 @@ export class ToolEngine {
       return;
     }
 
-    // 获取工具列表
-    console.log(`[Tool Engine] [depth:${depth}] Fetching tools from MCP: ${mcpId || 'default'}`);
-    const mcpManager = getMcpClientManager();
-    const tools = await mcpManager.listTools(mcpId);
-    console.log(`[Tool Engine] [depth:${depth}] Loaded ${tools.length} tools`);
-    
-    const functionDefinitions = mapMcpToolsToFunctions(tools);
-    console.log(`[Tool Engine] [depth:${depth}] Mapped to ${functionDefinitions.length} function definitions`);
+    // 获取工具列表（仅在启用 MCP 时）
+    let functionDefinitions:
+      | ReturnType<typeof mapMcpToolsToFunctions>
+      | undefined;
+    if (useMcp) {
+      console.log(
+        `[Tool Engine] [depth:${depth}] Fetching tools from MCP: ${mcpId || 'default'}`
+      );
+      const mcpManager = getMcpClientManager();
+      const tools = await mcpManager.listTools(mcpId);
+      console.log(
+        `[Tool Engine] [depth:${depth}] Loaded ${tools.length} tools`
+      );
+
+      functionDefinitions = mapMcpToolsToFunctions(tools);
+      console.log(
+        `[Tool Engine] [depth:${depth}] Mapped to ${functionDefinitions.length} function definitions`
+      );
+    } else {
+      console.log(
+        `[Tool Engine] [depth:${depth}] MCP disabled for this request, calling LLM without tools`
+      );
+      functionDefinitions = undefined;
+    }
 
     // 创建 LLM 客户端
     console.log(`[Tool Engine] [depth:${depth}] Creating LLM client: ${provider}/${model}`);
@@ -80,7 +99,10 @@ export class ToolEngine {
 
     // 调用 LLM（流式）
     console.log(`[Tool Engine] [depth:${depth}] Calling LLM chatStream with ${conversationMessages.length} messages`);
-    const stream = await llmClient.chatStream(conversationMessages, functionDefinitions);
+    const stream = await llmClient.chatStream(
+      conversationMessages,
+      functionDefinitions
+    );
     console.log(`[Tool Engine] [depth:${depth}] LLM stream obtained, starting to read`);
 
     // 读取流
@@ -210,12 +232,14 @@ export class ToolEngine {
         })),
       };
 
-      // 执行所有工具调用，收集所有结果
+      // 执行所有工具调用，收集所有结果（仅在启用 MCP 时）
       const toolResults: ChatMessage[] = [];
       
       for (let i = 0; i < toolCalls.length; i++) {
         const toolCall = toolCalls[i];
-        console.log(`[Tool Engine] [depth:${depth}] Executing tool call ${i + 1}/${toolCalls.length}: ${toolCall.name}`);
+        console.log(
+          `[Tool Engine] [depth:${depth}] Executing tool call ${i + 1}/${toolCalls.length}: ${toolCall.name}`
+        );
         yield { type: 'tool_call', data: { name: toolCall.name, arguments: toolCall.arguments } };
 
         try {
@@ -223,7 +247,11 @@ export class ToolEngine {
             ? JSON.parse(toolCall.arguments) 
             : toolCall.arguments;
 
-          console.log(`[Tool Engine] [depth:${depth}] Calling MCP tool: ${toolCall.name} with args:`, args);
+          console.log(
+            `[Tool Engine] [depth:${depth}] Calling MCP tool: ${toolCall.name} with args:`,
+            args
+          );
+          const mcpManager = getMcpClientManager();
           const toolResult = await mcpManager.callTool(mcpId, toolCall.name, args);
           console.log(`[Tool Engine] [depth:${depth}] Tool call ${toolCall.name} completed`);
 
@@ -258,6 +286,7 @@ export class ToolEngine {
           model,
           [...conversationMessages, assistantMsg, ...toolResults],
           mcpId,
+          useMcp,
           depth + 1
         );
       } else {
