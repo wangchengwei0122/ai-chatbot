@@ -28,7 +28,7 @@ function App() {
   }, [])
 
   const handleAsk = () => {
-    chatbotRef.current?.ask?.('测试提问：你好，请介绍一下你自己')
+    chatbotRef.current?.ask?.('查询企查查科技股份有限公司的企业的工商信息，如企业类型、注册资本、成立日期、登记状态、行政区划等信息')
   }
 
   const handleOpen = () => {

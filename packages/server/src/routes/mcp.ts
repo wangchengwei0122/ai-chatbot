@@ -4,8 +4,8 @@
  */
 
 import { FastifyPluginAsync } from 'fastify';
-import { getMcpClientManager } from '../mcp/client';
-import { ToolEngine } from '../engine/toolEngine';
+import { getMcpClientManager } from '../mcp/client.js';
+import { ToolEngine } from '../engine/toolEngine.js';
 
 const mcpRoutes: FastifyPluginAsync = async (fastify) => {
   const mcpManager = getMcpClientManager();

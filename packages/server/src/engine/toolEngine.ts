@@ -3,9 +3,9 @@
  * 递归多轮工具调用，支持流式响应
  */
 
-import { LLMClient, type ChatMessage } from '../llm/client';
-import { getMcpClientManager } from '../mcp/client';
-import { mapMcpToolsToFunctions } from '../mcp/mapper';
+import { LLMClient, type ChatMessage } from '../llm/client.js';
+import { getMcpClientManager } from '../mcp/client.js';
+import { mapMcpToolsToFunctions } from '../mcp/mapper.js';
 
 export interface StreamChunk {
   type: 'token' | 'tool_call' | 'finish';

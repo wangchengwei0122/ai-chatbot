@@ -1,4 +1,5 @@
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import AutoLoad, { AutoloadPluginOptions } from '@fastify/autoload'
 import { FastifyPluginAsync, FastifyServerOptions } from 'fastify'
 import cors from '@fastify/cors'
@@ -6,6 +7,10 @@ import dotenv from 'dotenv'
 
 // 加载环境变量
 dotenv.config()
+
+// ESM 中获取 __dirname 的替代方案
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export interface AppOptions extends FastifyServerOptions, Partial<AutoloadPluginOptions> {
 

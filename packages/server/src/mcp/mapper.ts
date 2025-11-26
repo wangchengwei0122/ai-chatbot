@@ -3,7 +3,7 @@
  * 将 MCP 工具 schema 转换为 OpenAI function schema
  */
 
-import type { McpTool } from './client';
+import type { McpTool } from './client.js';
 
 export interface FunctionDefinition {
   name: string;
