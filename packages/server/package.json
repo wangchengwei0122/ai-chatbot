@@ -1,6 +1,8 @@
 {
-	"name": "@qcc/mcp-proxy-server",
-	"version": "1.0.0",
+	"name": "@ai-chatbot/server",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
 	"description": "This project was bootstrapped with Fastify-CLI.",
 	"main": "app.ts",
 	"directories": {

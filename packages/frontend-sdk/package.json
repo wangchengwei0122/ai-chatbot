@@ -1,5 +1,5 @@
 {
-	"name": "@qcc/frontend-sdk",
+	"name": "@ai-chatbot/frontend-sdk",
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",

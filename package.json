@@ -1,13 +1,23 @@
 {
-  "name": "ai-chatbot",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.12.1"
+	"name": "ai-chatbot",
+	"version": "1.0.0",
+	"description": "",
+	"private": true,
+	"main": "index.js",
+	"workspaces": [
+		"packages/*"
+	],
+	"scripts": {
+		"dev": "pnpm -w run dev:all",
+		"dev:all": "concurrently \"pnpm --filter @ai-chatbot/frontend-sdk dev\" \"pnpm --filter @ai-chatbot/server dev\"",
+		"dev:server": "pnpm --filter @ai-chatbot/server dev",
+		"dev:frontend": "pnpm --filter @ai-chatbot/frontend-sdk dev"
+	},
+	"devDependencies": {
+		"concurrently": "^8.2.2"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"packageManager": "pnpm@10.12.1"
 }
