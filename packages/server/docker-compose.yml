@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  mcp-proxy:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - MCP_SERVERS_JSON=${MCP_SERVERS_JSON}
+      - MCP_DEFAULT=${MCP_DEFAULT:-basic}
+      - LLM_CONFIG=${LLM_CONFIG}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    env_file:
+      - .env
+    restart: unless-stopped
+
