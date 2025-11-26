@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QCC AI Chatbot Web Component Demo</title>
+  <link rel="stylesheet" href="./dist/chatbot.css" />
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #f3f4f6;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+    }
+
+    .demo-container {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="demo-container">
+    <qcc-ai-chatbot proxy-url="http://localhost:3000" provider="qwen" model="qwen-plus" title="企业 AI 助手"
+      theme-color="#2563eb" debug="true"></qcc-ai-chatbot>
+  </div>
+
+  <script type="module" src="./dist/qcc-ai-chatbot.js"></script>
+</body>
+
+</html>

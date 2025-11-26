@@ -61,6 +61,15 @@ importers:
         specifier: ^7.2.4
         version: 7.2.4(@types/node@24.10.1)
 
+  packages/frontend-sdk-wc:
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.2.4
+        version: 7.2.4(@types/node@24.10.1)
+
   packages/server:
     dependencies:
       '@fastify/autoload':

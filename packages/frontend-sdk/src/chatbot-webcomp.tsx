@@ -1,16 +1,17 @@
-import { createRoot, Root } from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
+import type { Root } from 'react-dom/client';
 import ChatWidget, { type ChatWidgetProps, type ChatWidgetRef } from './components/ChatWidget';
 import chatWidgetStyles from './components/ChatWidget.css?inline';
 
 class QccAiChatbot extends HTMLElement {
   private root: Root | null = null;
   private widgetRef: ChatWidgetRef | null = null;
-  private shadowRoot: ShadowRoot;
+  private readonly shadowRootRef: ShadowRoot;
 
   constructor() {
     super();
     // 创建 Shadow DOM 实现样式隔离
-    this.shadowRoot = this.attachShadow({ mode: 'open' });
+    this.shadowRootRef = this.attachShadow({ mode: 'open' });
   }
 
   static get observedAttributes() {
@@ -28,7 +29,7 @@ class QccAiChatbot extends HTMLElement {
     }
   }
 
-  attributeChangedCallback(name: string, oldValue: string, newValue: string) {
+  attributeChangedCallback(_name: string, oldValue: string | null, newValue: string | null) {
     if (oldValue !== newValue && this.root) {
       // 属性变化时重新渲染
       this.render();
@@ -49,17 +50,17 @@ class QccAiChatbot extends HTMLElement {
 
   private render() {
     // 清空 Shadow DOM
-    this.shadowRoot.innerHTML = '';
+    this.shadowRootRef.innerHTML = '';
 
     // 注入 CSS 样式
     const styleElement = document.createElement('style');
     styleElement.textContent = chatWidgetStyles;
-    this.shadowRoot.appendChild(styleElement);
+    this.shadowRootRef.appendChild(styleElement);
 
     // 创建容器
     const container = document.createElement('div');
     container.id = 'chatbot-root';
-    this.shadowRoot.appendChild(container);
+    this.shadowRootRef.appendChild(container);
 
     // 创建 React Root 并渲染
     this.root = createRoot(container);

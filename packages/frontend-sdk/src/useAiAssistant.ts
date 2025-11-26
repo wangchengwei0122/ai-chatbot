@@ -3,7 +3,7 @@
  * 框架无关的 hook API，管理消息状态和事件
  */
 
-import type { Message, AiAssistantConfig, NormalizedConfig } from './types';
+import type { Message, AiAssistantConfig } from './types';
 import { normalizeConfig } from './core/configNormalizer';
 import { AiEngine } from './core/AiEngine';
 import { EventEmitter } from './core/EventEmitter';
@@ -162,10 +162,9 @@ export function useAiAssistant(config: AiAssistantConfig): UseAiAssistantReturn 
  * React Hook 包装器（可选）
  * 如果使用 React，可以使用这个包装器
  */
-export function useAiAssistantReact(config: AiAssistantConfig) {
+export function useAiAssistantReact(_config: AiAssistantConfig) {
   // 这里需要 React 的 useState 和 useEffect
   // 但由于要保持框架无关，我们不在核心文件中引入 React
   // 这个函数可以在 React 特定的文件中实现
   throw new Error('This function should be implemented in a React-specific file');
 }
-
