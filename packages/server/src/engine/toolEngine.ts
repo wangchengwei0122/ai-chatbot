@@ -29,18 +29,18 @@ export class ToolEngine {
     provider: string,
     model: string,
     messages: ChatMessage[],
-    mcpId?: string,
-    useMcp: boolean = true
+    selectedMcpIds: string[] = []
   ): AsyncGenerator<StreamChunk, void, unknown> {
+    const useMcp = Array.isArray(selectedMcpIds) && selectedMcpIds.length > 0;
     console.log('[Tool Engine] processMessageStream started:', {
       provider,
       model,
-      mcpId,
+      selectedMcpIds,
       messagesCount: messages.length,
       useMcp,
     });
     try {
-      yield* this.processWithToolsStream(provider, model, messages, mcpId, useMcp, 0);
+      yield* this.processWithToolsStream(provider, model, messages, selectedMcpIds, useMcp, 0);
       console.log('[Tool Engine] processMessageStream completed');
     } catch (error) {
       console.error('[Tool Engine] processMessageStream error:', error);
@@ -55,7 +55,7 @@ export class ToolEngine {
     provider: string,
     model: string,
     conversationMessages: ChatMessage[],
-    mcpId: string | undefined,
+    selectedMcpIds: string[],
     useMcp: boolean,
     depth: number
   ): AsyncGenerator<StreamChunk, void, unknown> {
@@ -74,12 +74,13 @@ export class ToolEngine {
       | undefined;
     if (useMcp) {
       console.log(
-        `[Tool Engine] [depth:${depth}] Fetching tools from MCP: ${mcpId || 'default'}`
+        `[Tool Engine] [depth:${depth}] Fetching tools from ${selectedMcpIds.length} MCPs:`,
+        selectedMcpIds
       );
       const mcpManager = getMcpClientManager();
-      const tools = await mcpManager.listTools(mcpId);
+      const tools = await mcpManager.listToolsForMany(selectedMcpIds);
       console.log(
-        `[Tool Engine] [depth:${depth}] Loaded ${tools.length} tools`
+        `[Tool Engine] [depth:${depth}] Loaded ${tools.length} tools from ${selectedMcpIds.length} MCPs`
       );
 
       functionDefinitions = mapMcpToolsToFunctions(tools);
@@ -252,7 +253,8 @@ export class ToolEngine {
             args
           );
           const mcpManager = getMcpClientManager();
-          const toolResult = await mcpManager.callTool(mcpId, toolCall.name, args);
+          // callTool 会自动解析前缀 <mcpId>__<toolName>
+          const toolResult = await mcpManager.callTool(undefined, toolCall.name, args);
           console.log(`[Tool Engine] [depth:${depth}] Tool call ${toolCall.name} completed`);
 
           // 添加工具结果消息
@@ -285,7 +287,7 @@ export class ToolEngine {
           provider,
           model,
           [...conversationMessages, assistantMsg, ...toolResults],
-          mcpId,
+          selectedMcpIds,
           useMcp,
           depth + 1
         );

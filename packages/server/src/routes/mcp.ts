@@ -107,12 +107,12 @@ const mcpRoutes: FastifyPluginAsync = async (fastify) => {
     console.log(`[MCP Routes] [${requestId}] Request received:`, {
       provider: request.body.provider,
       model: request.body.model,
-      mcp: request.body.mcp,
+      selectedMcpIds: request.body.selectedMcpIds,
       messagesCount: request.body.messages?.length,
     });
 
     try {
-      const { mcp, provider, model, messages, selectedMcpIds } = request.body;
+      const { provider, model, messages, selectedMcpIds } = request.body;
 
       if (!provider || !model) {
         console.error(`[MCP Routes] [${requestId}] Validation failed: provider or model missing`);
@@ -132,11 +132,12 @@ const mcpRoutes: FastifyPluginAsync = async (fastify) => {
         };
       }
 
-      const enableMcp =
-        Array.isArray(selectedMcpIds) && selectedMcpIds.length > 0;
+      // 确保 selectedMcpIds 是数组格式
+      const validSelectedMcpIds = Array.isArray(selectedMcpIds) ? selectedMcpIds : [];
+      const enableMcp = validSelectedMcpIds.length > 0;
 
       console.log(
-        `[MCP Routes] [${requestId}] Validation passed, setting up SSE headers (enableMcp=${enableMcp})`
+        `[MCP Routes] [${requestId}] Validation passed, setting up SSE headers (enableMcp=${enableMcp}, selectedMcpIds=${JSON.stringify(validSelectedMcpIds)})`
       );
 
       // CORS 头（Fastify CORS 对 raw 响应不自动处理，需要手动设置）
@@ -203,8 +204,7 @@ const mcpRoutes: FastifyPluginAsync = async (fastify) => {
           provider,
           model,
           messages,
-          mcp,
-          enableMcp
+          validSelectedMcpIds
         )) {
           if (isClosed) {
             console.log(`[MCP Routes] [${requestId}] Connection already closed, breaking loop`);

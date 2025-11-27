@@ -347,9 +347,57 @@ export class McpClientManager {
   }
 
   /**
-   * 调用工具
+   * 获取多个 MCP 的工具列表（并行调用，自动添加前缀）
+   */
+  async listToolsForMany(mcpIds: string[]): Promise<McpTool[]> {
+    if (!mcpIds || mcpIds.length === 0) {
+      return [];
+    }
+
+    console.log(`[MCP Manager] Fetching tools from ${mcpIds.length} MCP servers:`, mcpIds);
+
+    // 并行获取所有 MCP 的工具列表
+    const toolPromises = mcpIds.map(async (mcpId) => {
+      try {
+        const client = this.getClient(mcpId);
+        const tools = await client.listTools();
+        
+        // 为每个工具添加前缀 <mcpId>__<toolName>
+        const prefixedTools: McpTool[] = tools.map((tool) => ({
+          ...tool,
+          name: `${mcpId}__${tool.name}`,
+        }));
+
+        console.log(`[MCP Manager] Loaded ${prefixedTools.length} tools from ${mcpId} (with prefix)`);
+        return prefixedTools;
+      } catch (error) {
+        console.error(`[MCP Manager] Failed to load tools from ${mcpId}:`, error);
+        // 返回空数组，不阻断其他 MCP
+        return [];
+      }
+    });
+
+    const toolArrays = await Promise.all(toolPromises);
+    const allTools = toolArrays.flat();
+
+    console.log(`[MCP Manager] Total tools loaded from ${mcpIds.length} MCPs: ${allTools.length}`);
+    return allTools;
+  }
+
+  /**
+   * 调用工具（支持带前缀的工具名称）
+   * 工具名称格式：<mcpId>__<toolName>
    */
   async callTool(mcpId: string | undefined, name: string, args: any): Promise<ToolCallResult> {
+    // 检查工具名称是否包含前缀
+    if (name.includes('__')) {
+      const [prefixMcpId, rawToolName] = name.split('__', 2);
+      console.log(`[MCP Manager] Parsed tool name: ${name} -> mcpId=${prefixMcpId}, toolName=${rawToolName}`);
+      const client = this.getClient(prefixMcpId);
+      return await client.callTool(rawToolName, args);
+    }
+
+    // 向后兼容：如果没有前缀，使用传入的 mcpId
     const client = this.getClient(mcpId);
     return await client.callTool(name, args);
   }
