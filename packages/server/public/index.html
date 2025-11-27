@@ -39,21 +39,47 @@
       .box {
         position: static;
       }
+
+      .control-warp {
+        display: none;
+      }
     }
   </style>
 </head>
 
 <body>
   <div class="control-warp">
-    <div>点击打开</div>
-
+    <button class="open-btn">点击打开</button>
+    <button class="close-btn">点击关闭</button>
+    <button class="clear-btn">点击查询</button>
   </div>
+
   <div class="demo-container">
-    <qcc-ai-chatbot class="box" proxy-url="http://localhost:3002" provider="qwen" model="qwen-plus" title="企业 AI 助手"
+    <qcc-ai-chatbot class="box" proxy-url="http://172.18.105.75:3002" provider="qwen" model="qwen-plus" title="企业 AI 助手"
       theme-color="#128bed" debug="true"></qcc-ai-chatbot>
   </div>
 
   <script type="module" src="./dist/qcc-ai-chatbot.js"></script>
+
+  <script>
+    const openBtn = document.querySelector('.open-btn');
+    const closeBtn = document.querySelector('.close-btn');
+    const clearBtn = document.querySelector('.clear-btn');
+    const chatbot = document.querySelector('qcc-ai-chatbot');
+
+    openBtn.addEventListener('click', () => {
+      chatbot.open();
+    });
+    closeBtn.addEventListener('click', () => {
+      chatbot.close();
+    });
+    clearBtn.addEventListener('click', () => {
+      chatbot.open('查询企查查科技股份有限公司的工商信息，如企业类型、注册资本、成立日期、登记状态、行政区划等信息');
+    });
+
+
+
+  </script>
 </body>
 
 </html>
