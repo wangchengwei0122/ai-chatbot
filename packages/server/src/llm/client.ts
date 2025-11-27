@@ -66,7 +66,7 @@ const PROVIDER_BASE_URLS: Record<LLMProvider, string> = {
   deepseek: 'https://api.deepseek.com/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
   qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-  ollama: 'http://localhost:11434/v1',
+  ollama: 'http://192.168.43.23:11434',
 };
 
 /**

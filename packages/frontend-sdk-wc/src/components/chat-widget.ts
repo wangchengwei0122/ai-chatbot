@@ -64,15 +64,15 @@ export class QccAiChatbot extends HTMLElement {
   private isQuickMenuOpen = false;
   private quickPhrases = [
     {
-      name:'帮我查询企业工商信息',
+      name:'查询企业工商信息',
       content:'帮我查询企查查科技股份有限公司的企业工商信息',
     },
     {
-      name:'帮我查询企业风险信息',
+      name:'查询企业风险信息',
       content:'帮我查询美团的行政处罚信息',
     },
     {
-      name:'帮我查询企业知识产权',
+      name:'查询企业知识产权',
       content:'帮我查询企查查科技股份有限公司的企业知识产权',
     },
     
@@ -530,7 +530,10 @@ export class QccAiChatbot extends HTMLElement {
     clearBtn.className = 'qcc-chatbot__plain-button';
     clearBtn.textContent = '清空';
     clearBtn.addEventListener('click', () => {
+      // eslint-disable-next-line no-console
+      console.log('[qcc-ai-chatbot] Clear button clicked');
       this.clearMessages();
+      void this.resetServerConversation();
     });
 
     const loading = document.createElement('span');
@@ -1027,6 +1030,58 @@ export class QccAiChatbot extends HTMLElement {
       this.quickMenuEl.classList.add('qcc-chatbot__quick-menu--open');
     } else {
       this.quickMenuEl.classList.remove('qcc-chatbot__quick-menu--open');
+    }
+  }
+
+  // =========================
+  // 服务端会话重置
+  // =========================
+
+  private async resetServerConversation(): Promise<void> {
+    // eslint-disable-next-line no-console
+    console.log('[qcc-ai-chatbot] resetServerConversation called');
+    
+    // 直接获取 proxy-url 属性，不依赖 buildCoreConfig
+    const proxyUrl = this.getAttribute('proxy-url') || '';
+    
+    // eslint-disable-next-line no-console
+    console.log('[qcc-ai-chatbot] proxy-url attribute:', proxyUrl);
+    
+    if (!proxyUrl) {
+      // eslint-disable-next-line no-console
+      console.warn('[qcc-ai-chatbot] Cannot reset server conversation: proxy-url attribute is missing');
+      return;
+    }
+
+    try {
+      const normalizedProxyUrl = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl;
+      const url = `${normalizedProxyUrl}/conversation/reset`;
+      
+      // eslint-disable-next-line no-console
+      console.log('[qcc-ai-chatbot] Resetting server conversation:', url);
+      
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId: null,
+        }),
+      });
+
+      if (!resp.ok) {
+        // eslint-disable-next-line no-console
+        console.warn('[qcc-ai-chatbot] Failed to reset server conversation:', resp.status, resp.statusText);
+        return;
+      }
+
+      // eslint-disable-next-line no-console
+      console.log('[qcc-ai-chatbot] Server conversation reset successfully');
+    } catch (error) {
+      const formatted = formatError(error as Error);
+      // eslint-disable-next-line no-console
+      console.error('[qcc-ai-chatbot] Error resetting server conversation:', formatted);
     }
   }
 }
