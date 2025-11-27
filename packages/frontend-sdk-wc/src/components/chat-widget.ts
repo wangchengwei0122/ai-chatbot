@@ -1,5 +1,5 @@
 import type { AiAssistantConfig, Message, MessageRole } from '../types';
-import type { QccMessageBubble } from './message-bubble';
+import { QccMessageBubble } from './message-bubble';
 import { normalizeConfig } from '../core/configNormalizer';
 import { AiEngine } from '../core/AiEngine';
 import { EventEmitter } from '../core/EventEmitter';
@@ -302,7 +302,11 @@ export class QccAiChatbot extends HTMLElement {
       this.messages = this.engine.getMessages();
       const lastAssistant = [...this.messages].reverse().find((m) => m.role === 'assistant');
       this.streamingMessageId = lastAssistant?.id ?? null;
-      this.renderMessages();
+      const updated = this.updateStreamingBubbleContent(lastAssistant);
+      if (!updated) {
+        this.renderMessages();
+        this.updateStreamingBubbleContent(lastAssistant);
+      }
       this.scrollToBottom();
       this.updateLoadingState();
     });
@@ -587,7 +591,8 @@ export class QccAiChatbot extends HTMLElement {
 
     for (const msg of this.messages) {
       const line = document.createElement('div');
-      line.className = 'qcc-chatbot__message-line';
+      line.className = 'qcc-chatbot__message qcc-chatbot__message-line';
+      line.dataset.messageId = msg.id;
       const bubble = document.createElement(
         'qcc-message-bubble'
       ) as unknown as QccMessageBubble;
@@ -598,6 +603,11 @@ export class QccAiChatbot extends HTMLElement {
           : 'system';
 
       bubble.setAttribute('role', role);
+      if (role === 'user') {
+        line.classList.add('qcc-chatbot__message--user');
+      } else {
+        line.classList.add('qcc-chatbot__message--assistant');
+      }
 
       if (this.streamingMessageId && msg.id === this.streamingMessageId) {
         bubble.setAttribute('streaming', '');
@@ -610,6 +620,18 @@ export class QccAiChatbot extends HTMLElement {
       line.appendChild(bubble);
       container.appendChild(line);
     }
+  }
+
+  private updateStreamingBubbleContent(message: Message | undefined): boolean {
+    if (!message || !this.messagesEl) return false;
+    const bubble = this.messagesEl.querySelector(
+      `[data-message-id="${message.id}"] qcc-message-bubble`
+    );
+    if (bubble) {
+      bubble.textContent = message.content;
+      return true;
+    }
+    return false;
   }
 
   private renderToolStatus(): void {
