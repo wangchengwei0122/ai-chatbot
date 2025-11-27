@@ -354,6 +354,72 @@
   color: #0f172a;
 }
 
+/* --- 新增：快捷短语菜单样式 --- */
+:host .qcc-chatbot__quick-menu {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 0;
+  margin-top: 6px;
+  min-width: 200px;
+  max-width: 280px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  font-size: 13px;
+  color: #0f172a;
+  box-sizing: border-box;
+  z-index: 10;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+:host .qcc-chatbot__quick-menu--open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+:host .qcc-chatbot__quick-menu-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+:host .qcc-chatbot__quick-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+:host .qcc-chatbot__quick-menu-empty {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+:host .qcc-chatbot__quick-item {
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #0f172a;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  line-height: 1.4;
+}
+
+:host .qcc-chatbot__quick-item:hover {
+  background: #f8fafc;
+  color: var(--qcc-chatbot-theme-color, #128bed);
+}
+
+:host .qcc-chatbot__quick-item:active {
+  background: #f1f5f9;
+}
+
 :host .qcc-chatbot__input-row {
   display: flex;
   align-items: flex-end;
@@ -623,6 +689,14 @@
   }
 
   :host .qcc-chatbot--mobile .qcc-chatbot__mcp-menu {
+    left: 0;
+    right: 0;
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+  }
+
+  :host .qcc-chatbot--mobile .qcc-chatbot__quick-menu {
     left: 0;
     right: 0;
     min-width: 0;

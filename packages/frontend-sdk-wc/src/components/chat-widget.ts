@@ -37,6 +37,8 @@ export class QccAiChatbot extends HTMLElement {
   private inputEl: HTMLTextAreaElement | null = null;
   private mcpMenuEl: HTMLDivElement | null = null;
   private mcpIconButtonEl: HTMLButtonElement | null = null;
+  private quickMenuEl: HTMLDivElement | null = null;
+  private quickPhrasesButtonEl: HTMLButtonElement | null = null;
   private sendButtonEl: HTMLButtonElement | null = null;
   private loadingTextEl: HTMLSpanElement | null = null;
   private fabButtonEl: HTMLButtonElement | null = null;
@@ -57,6 +59,24 @@ export class QccAiChatbot extends HTMLElement {
   private selectedMcpIds: string[] = [];
   private isMcpMenuOpen = false;
   private documentClickHandler: ((event: MouseEvent) => void) | null = null;
+
+  // 快捷短语相关 state
+  private isQuickMenuOpen = false;
+  private quickPhrases = [
+    {
+      name:'帮我查询企业工商信息',
+      content:'帮我查询企查查科技股份有限公司的企业工商信息',
+    },
+    {
+      name:'帮我查询企业风险信息',
+      content:'帮我查询美团的行政处罚信息',
+    },
+    {
+      name:'帮我查询企业知识产权',
+      content:'帮我查询企查查科技股份有限公司的企业知识产权',
+    },
+    
+  ];
 
   private uiTitle = '智能助手';
   private themeColor: string | null = null;
@@ -443,9 +463,29 @@ export class QccAiChatbot extends HTMLElement {
     `;
     mcpButton.addEventListener('click', (event: MouseEvent) => {
       event.stopPropagation();
+      this.closeQuickMenu(); // 打开 MCP 菜单时关闭快捷菜单
       this.toggleMcpMenu();
     });
     this.mcpIconButtonEl = mcpButton;
+
+    // --- 新增：快捷短语按钮
+    const quickPhrasesButton = document.createElement('button');
+    quickPhrasesButton.type = 'button';
+    quickPhrasesButton.className = 'qcc-chatbot__toolbar-icon';
+    quickPhrasesButton.title = '快捷短语';
+    quickPhrasesButton.setAttribute('aria-label', '快捷短语');
+    quickPhrasesButton.innerHTML = `
+      <svg class="qcc-chatbot__icon" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M10 2a6 6 0 0 0-6 6c0 1.887.454 3.665 1.257 5.234a.75.75 0 0 0 1.305-.75 4.5 4.5 0 1 1 4.876 0 .75.75 0 0 0 1.305.75A7.993 7.993 0 0 0 16 8a6 6 0 0 0-6-6Zm0 1.5a4.5 4.5 0 0 1 4.5 4.5c0 1.443-.346 2.8-.957 3.998a.75.75 0 0 1-1.336-.496c.5-1.05.793-2.18.793-3.502a3 3 0 1 0-6 0c0 1.322.293 2.452.793 3.502a.75.75 0 0 1-1.336.496A7.95 7.95 0 0 1 5.5 8a4.5 4.5 0 0 1 4.5-4.5ZM9.25 8a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V8Zm1.5 0a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V8Z" fill="currentColor"/>
+      </svg>
+      <span class="qcc-chatbot__toolbar-icon-label">快捷</span>
+    `;
+    quickPhrasesButton.addEventListener('click', (event: MouseEvent) => {
+      event.stopPropagation();
+      this.closeMcpMenu(); // 打开快捷菜单时关闭 MCP 菜单
+      this.toggleQuickMenu();
+    });
+    this.quickPhrasesButtonEl = quickPhrasesButton;
 
     const inputRow = document.createElement('div');
     inputRow.className = 'qcc-chatbot__input-row';
@@ -519,8 +559,15 @@ export class QccAiChatbot extends HTMLElement {
     mcpMenu.className = 'qcc-chatbot__mcp-menu';
     this.mcpMenuEl = mcpMenu;
 
+    // --- 新增：快捷短语菜单
+    const quickMenu = document.createElement('div');
+    quickMenu.className = 'qcc-chatbot__quick-menu';
+    this.quickMenuEl = quickMenu;
+
     toolbar.appendChild(mcpButton);
     toolbar.appendChild(mcpMenu);
+    toolbar.appendChild(quickPhrasesButton);
+    toolbar.appendChild(quickMenu);
 
     // 工具栏在输入区域上方
     inputArea.appendChild(toolbar);
@@ -542,6 +589,7 @@ export class QccAiChatbot extends HTMLElement {
     this.renderToolStatus();
     this.updateLoadingState();
     this.renderMcpMenu();
+    this.renderQuickMenu();
   }
 
   private updateHeaderTitle(): void {
@@ -881,20 +929,35 @@ export class QccAiChatbot extends HTMLElement {
   private initDocumentClickListener(): void {
     if (this.documentClickHandler) return;
     this.documentClickHandler = (event: MouseEvent) => {
-      if (!this.isMcpMenuOpen) return;
       const target = event.target as Node | null;
       if (!target) return;
 
       const path = (event.composedPath && event.composedPath()) || [];
-      const clickedOnMenu =
+
+      // MCP 菜单相关判断
+      const clickedOnMcpMenu =
         (this.mcpMenuEl && path.includes(this.mcpMenuEl)) ||
         (this.mcpMenuEl && this.mcpMenuEl.contains(target));
-      const clickedOnIcon =
+      const clickedOnMcpIcon =
         (this.mcpIconButtonEl && path.includes(this.mcpIconButtonEl)) ||
         (this.mcpIconButtonEl && this.mcpIconButtonEl.contains(target));
 
-      if (!clickedOnMenu && !clickedOnIcon) {
+      // 快捷短语菜单相关判断
+      const clickedOnQuickMenu =
+        (this.quickMenuEl && path.includes(this.quickMenuEl)) ||
+        (this.quickMenuEl && this.quickMenuEl.contains(target));
+      const clickedOnQuickIcon =
+        (this.quickPhrasesButtonEl && path.includes(this.quickPhrasesButtonEl)) ||
+        (this.quickPhrasesButtonEl && this.quickPhrasesButtonEl.contains(target));
+
+      // 关闭 MCP 菜单（如果点击在外部）
+      if (this.isMcpMenuOpen && !clickedOnMcpMenu && !clickedOnMcpIcon) {
         this.closeMcpMenu();
+      }
+
+      // 关闭快捷短语菜单（如果点击在外部）
+      if (this.isQuickMenuOpen && !clickedOnQuickMenu && !clickedOnQuickIcon) {
+        this.closeQuickMenu();
       }
     };
     document.addEventListener('click', this.documentClickHandler, true);
@@ -904,6 +967,66 @@ export class QccAiChatbot extends HTMLElement {
     if (this.documentClickHandler) {
       document.removeEventListener('click', this.documentClickHandler, true);
       this.documentClickHandler = null;
+    }
+  }
+
+  // =========================
+  // 快捷短语菜单相关
+  // =========================
+
+  private renderQuickMenu(): void {
+    if (!this.quickMenuEl) return;
+    const menu = this.quickMenuEl;
+    menu.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.className = 'qcc-chatbot__quick-menu-title';
+    title.textContent = '选择快捷短语';
+    menu.appendChild(title);
+
+    if (!this.quickPhrases.length) {
+      const empty = document.createElement('div');
+      empty.className = 'qcc-chatbot__quick-menu-empty';
+      empty.textContent = '暂无快捷短语';
+      menu.appendChild(empty);
+    } else {
+      const list = document.createElement('div');
+      list.className = 'qcc-chatbot__quick-menu-list';
+
+      for (const phrase of this.quickPhrases) {
+        const item = document.createElement('div');
+        item.className = 'qcc-chatbot__quick-item';
+        item.textContent = phrase.name;
+        item.addEventListener('click', async () => {
+          this.closeQuickMenu();
+          await this.sendMessage(phrase.content);
+        });
+        list.appendChild(item);
+      }
+
+      menu.appendChild(list);
+    }
+
+    this.updateQuickMenuVisibility();
+  }
+
+  private toggleQuickMenu(): void {
+    this.isQuickMenuOpen = !this.isQuickMenuOpen;
+    this.updateQuickMenuVisibility();
+  }
+
+  private closeQuickMenu(): void {
+    if (!this.isQuickMenuOpen) return;
+    this.isQuickMenuOpen = false;
+    this.updateQuickMenuVisibility();
+  }
+
+  private updateQuickMenuVisibility(): void {
+    if (!this.quickMenuEl) return;
+    if (this.isQuickMenuOpen) {
+      this.quickMenuEl.classList.add('qcc-chatbot__quick-menu--open');
+    } else {
+      this.quickMenuEl.classList.remove('qcc-chatbot__quick-menu--open');
     }
   }
 }
