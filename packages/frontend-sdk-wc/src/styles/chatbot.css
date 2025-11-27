@@ -26,7 +26,7 @@
 :host .qcc-chatbot__panel {
   display: flex;
   flex-direction: column;
-  width: 600px;
+  width: 800px;
   height: 100vh;
   max-height: 100vh;
   border-radius: 0;
@@ -37,7 +37,7 @@
   position: fixed;
   right: 0;
   top: 0;
-  z-index: 2;
+  z-index: 10001;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   opacity: 1;
   transform: translateX(100%);
@@ -58,7 +58,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
-  z-index: 1;
+  z-index: 9999;
 }
 
 :host .qcc-chatbot__mask--visible {
