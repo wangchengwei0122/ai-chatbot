@@ -43,6 +43,7 @@ export class QccAiChatbot extends HTMLElement {
   private loadingTextEl: HTMLSpanElement | null = null;
   private fabButtonEl: HTMLButtonElement | null = null;
   private closeButtonEl: HTMLButtonElement | null = null;
+  private maskEl: HTMLDivElement | null = null;
 
   private engine: AiEngine | null = null;
   private eventEmitter: EventEmitter | null = null;
@@ -64,16 +65,16 @@ export class QccAiChatbot extends HTMLElement {
   private isQuickMenuOpen = false;
   private quickPhrases = [
     {
-      name:'查询企业工商信息',
-      content:'帮我查询企查查科技股份有限公司的企业工商信息',
+      name:'查找下，乐视这家公司目前的老板是谁，它还存在诉讼风险吗？',
+      content:'查找下，乐视这家公司目前的老板是谁，它还存在诉讼风险吗？',
     },
     {
-      name:'查询企业风险信息',
-      content:'帮我查询美团的行政处罚信息',
+      name:'平凉锦航商贸有限责任公司 这个公司是什么时候成立的？',
+      content:'平凉锦航商贸有限责任公司 这个公司是什么时候成立的？',
     },
     {
-      name:'查询企业知识产权',
-      content:'帮我查询企查查科技股份有限公司的企业知识产权',
+      name:'小米科技的雷军和金山软件的雷军是同一个人吗？',
+      content:'小米科技的雷军和金山软件的雷军是同一个人吗？',
     },
     
   ];
@@ -375,6 +376,15 @@ export class QccAiChatbot extends HTMLElement {
     root.className = 'qcc-chatbot qcc-chatbot--closed';
     this.rootEl = root;
 
+    const mask = document.createElement('div');
+    mask.className = 'qcc-chatbot__mask';
+    mask.addEventListener('click', () => {
+      if (this.isMobileViewport) return;
+      this.isOpen = false;
+      this.updateOpenState();
+    });
+    this.maskEl = mask;
+
     const panel = document.createElement('div');
     panel.className = 'qcc-chatbot__panel';
     panel.setAttribute('aria-hidden', 'true');
@@ -586,6 +596,7 @@ export class QccAiChatbot extends HTMLElement {
 
     root.appendChild(panel);
     root.appendChild(fab);
+    root.appendChild(mask);
     this.shadow.appendChild(root);
 
     this.renderMessages();
@@ -616,6 +627,11 @@ export class QccAiChatbot extends HTMLElement {
     root.classList.toggle('qcc-chatbot--mobile', this.isMobileViewport);
     if (this.panelEl) {
       this.panelEl.setAttribute('aria-hidden', this.isOpen ? 'false' : 'true');
+    }
+    if (this.maskEl) {
+      const shouldShowMask = this.isOpen && !this.isMobileViewport;
+      this.maskEl.classList.toggle('qcc-chatbot__mask--visible', shouldShowMask);
+      this.maskEl.setAttribute('aria-hidden', shouldShowMask ? 'false' : 'true');
     }
     if (this.fabButtonEl) {
       this.fabButtonEl.setAttribute('aria-expanded', this.isOpen ? 'true' : 'false');

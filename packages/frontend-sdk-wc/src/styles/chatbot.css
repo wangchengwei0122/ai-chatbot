@@ -26,27 +26,53 @@
 :host .qcc-chatbot__panel {
   display: flex;
   flex-direction: column;
-  width: min(400px, calc(100vw - 32px));
-  height: 560px;
-  max-height: calc(100vh - 48px);
-  border-radius: var(--qcc-chatbot-radius);
+  width: 600px;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
   background: var(--qcc-chatbot-surface);
   box-shadow: var(--qcc-chatbot-shadow);
   border: 1px solid var(--qcc-chatbot-border);
   overflow: hidden;
-  position: absolute;
+  position: fixed;
   right: 0;
-  bottom: 0px;
+  top: 0;
   z-index: 2;
-  transition: opacity 0.25s ease, transform 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
   opacity: 1;
-  transform-origin: bottom right;
+  transform: translateX(100%);
 }
 
-:host .qcc-chatbot--closed .qcc-chatbot__panel {
-  opacity: 0;
-  transform: translateY(12px) scale(0.98);
+:host .qcc-chatbot--open:not(.qcc-chatbot--mobile) .qcc-chatbot__panel {
+  transform: translateX(0);
+}
+
+:host .qcc-chatbot--closed:not(.qcc-chatbot--mobile) .qcc-chatbot__panel {
   pointer-events: none;
+}
+
+:host .qcc-chatbot__mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+
+:host .qcc-chatbot__mask--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+:host .qcc-chatbot--open:not(.qcc-chatbot--mobile) .qcc-chatbot__mask {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+:host .qcc-chatbot--mobile .qcc-chatbot__mask {
+  display: none;
 }
 
 :host .qcc-chatbot__fab {
@@ -140,14 +166,6 @@
   transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
-:host .qcc-chatbot__circle-button:hover {
-  border-color: rgba(15, 23, 42, 0.2);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
-}
-
-:host .qcc-chatbot__circle-button:active {
-  transform: scale(0.94);
-}
 
 :host .qcc-chatbot__icon {
   width: 20px;
@@ -608,12 +626,15 @@
 }
 
 :host .qcc-chatbot--mobile .qcc-chatbot__panel {
-  position: relative;
-  right: auto;
-  bottom: auto;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
   width: 100%;
-  height: 100%;
-  max-height: 100%;
+  height: 100vh;
+  max-height: 100vh;
+  transform: none;
   border-radius: 0;
   box-shadow: none;
   border: none;
